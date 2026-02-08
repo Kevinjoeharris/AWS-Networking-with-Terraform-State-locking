@@ -177,6 +177,19 @@ resource "aws_vpc_security_group_egress_rule" "allow_all_traffic_ipv4" {
   ip_protocol       = "-1" # semantically equivalent to all ports
 }
 
+#EC2 Security Group
+resource "aws_security_group" "app_sg" {
+  vpc_id = aws_vpc.aws-networking-vpc.id
+}
+
+resource "aws_vpc_security_group_ingress_rule" "app_from_alb" {
+  security_group_id            = aws_security_group.app_sg.id
+  referenced_security_group_id = aws_security_group.allow_tls.id
+  from_port                    = 80
+  to_port                      = 80
+  ip_protocol                  = "tcp"
+}
+
 #ALB
 resource "aws_lb" "lb" {
   name               = "lb-tf"
