@@ -112,7 +112,7 @@ resource "aws_route_table" "private_route_table1" {
   vpc_id = aws_vpc.aws-networking-vpc.id
 
   route {
-    cidr_block = "10.0.1.0/24"
+    cidr_block = "0.0.0.0/0"
     nat_gateway_id = aws_nat_gateway.nat-1.id
   }
   tags = {
@@ -125,7 +125,7 @@ resource "aws_route_table" "private_route_table2" {
   vpc_id = aws_vpc.aws-networking-vpc.id
 
   route {
-    cidr_block = "10.0.2.0/24"
+    cidr_block = "0.0.0.0/0"
     nat_gateway_id = aws_nat_gateway.nat-2.id
   }
   tags = {
@@ -144,6 +144,57 @@ resource "aws_route_table_association" "private_rt_2" {
   route_table_id = aws_route_table.private_route_table2.id
 }
 
+#ALB Security Group
+resource "aws_security_group" "allow_tls" {
+  name        = "allow_tls"
+  description = "Allow TLS inbound traffic and all outbound traffic"
+  vpc_id      = aws_vpc.aws-networking-vpc.id
 
+  tags = {
+    Name = "allow_tls"
+  }
+}
 
+resource "aws_vpc_security_group_ingress_rule" "allow_tls_ipv4_https" {
+  security_group_id = aws_security_group.allow_tls.id
+  cidr_ipv4         = "0.0.0.0/0"
+  from_port         = 443
+  ip_protocol       = "tcp"
+  to_port           = 443
+}
+
+resource "aws_vpc_security_group_ingress_rule" "allow_tls_ipv4_http" {
+  security_group_id = aws_security_group.allow_tls.id
+  cidr_ipv4         = "0.0.0.0/0"
+  from_port         = 80
+  ip_protocol       = "tcp"
+  to_port           = 80
+}
+
+resource "aws_vpc_security_group_egress_rule" "allow_all_traffic_ipv4" {
+  security_group_id = aws_security_group.allow_tls.id
+  cidr_ipv4         = "0.0.0.0/0"
+  ip_protocol       = "-1" # semantically equivalent to all ports
+}
+
+#ALB
+resource "aws_lb" "lb" {
+  name               = "lb-tf"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.lb_sg.id]
+  subnets            = [for subnet in aws_subnet.public : subnet.id]
+
+  enable_deletion_protection = true
+
+  access_logs {
+    bucket  = aws_s3_bucket.lb_logs.id
+    prefix  = "test-lb"
+    enabled = true
+  }
+
+  tags = {
+    Environment = "production"
+  }
+}
 #Auto-Scaling Groups
